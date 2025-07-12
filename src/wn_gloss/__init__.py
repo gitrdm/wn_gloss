@@ -1,21 +1,16 @@
 """WN Gloss - A Python project for WordNet glosses."""
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
-from .database import WordNetGlossDB
-from .parser import parse_wordnet_directory, MergedXMLParser, StandoffXMLParser
-from .models import Synset, Term, SenseKey, Gloss, Token, Annotation, Collocation
+from .jsonl_processor import WordNetGlossProcessor, ConversionResult, JSONLRecord
+from .parser import parse_wordnet_directory, MergedXMLParser, StandoffXMLParser, GlossData
 
 __all__ = [
-    "WordNetGlossDB",
+    "WordNetGlossProcessor",
+    "ConversionResult", 
+    "JSONLRecord",
     "parse_wordnet_directory",
     "MergedXMLParser", 
     "StandoffXMLParser",
-    "Synset",
-    "Term",
-    "SenseKey",
-    "Gloss",
-    "Token",
-    "Annotation",
-    "Collocation"
+    "GlossData"
 ]
