@@ -236,3 +236,6 @@ fabric.properties
 
 # VS Code
 .vscode/
+
+# WordNet gloss data directory (linked to shared drive)
+old_gloss/
