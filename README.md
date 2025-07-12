@@ -1,6 +1,6 @@
 # WN Gloss - WordNet Gloss Disambiguation Project Modernization
 
-A modern Python 3.11 project for converting WordNet Gloss Disambiguation Project 3.0 data in JSONL format with DuckDB analytics support. The original data was obtained from https://wordnetcode.princeton.edu/glosstag.shtml in July 2025. The webpage of the original data retains copyright and includes the verbage "When using this freely available resource, we ask that you refer to it as the "Princeton WordNet Gloss Corpus.". I do not know of any licensing issues with converting and using the data. This project is released under an MIT license. 
+A modern Python 3.11 project for converting WordNet Gloss Disambiguation Project 3.0 data into JSONL format with DuckDB analytics support. The original data was obtained from https://wordnetcode.princeton.edu/glosstag.shtml in July 2025. The webpage of the original data retains copyright and includes the verbage "When using this freely available resource, we ask that you refer to it as the "Princeton WordNet Gloss Corpus.". I do not know of any licensing issues with converting and using the data. This project is released under an MIT license. 
 
 
 
