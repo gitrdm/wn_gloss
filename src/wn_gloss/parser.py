@@ -769,14 +769,21 @@ class IndexParser:
         return self.parse_index_file("bylem")
 
 
-def parse_wordnet_directory(wordnet_dir: Union[str, Path]) -> List[GlossData]:
-    """Parse entire WordNet directory structure."""
+def parse_wordnet_directory(
+    wordnet_dir: Union[str, Path], 
+    dtd_path: Optional[Union[str, Path]] = None,
+    validate_dtd: bool = False
+) -> List[GlossData]:
+    """Parse entire WordNet directory structure with optional DTD validation."""
     wordnet_dir = Path(wordnet_dir)
     
     # Try merged format first
     merged_dir = wordnet_dir / "merged"
     if merged_dir.exists():
-        parser = MergedXMLParser()
+        parser = MergedXMLParser(
+            dtd_path=dtd_path,
+            validate_dtd=validate_dtd
+        )
         all_glosses = []
         
         for pos_file in ["noun.xml", "verb.xml", "adj.xml", "adv.xml"]:
@@ -790,7 +797,10 @@ def parse_wordnet_directory(wordnet_dir: Union[str, Path]) -> List[GlossData]:
     # Fall back to standoff format
     standoff_dir = wordnet_dir / "standoff"
     if standoff_dir.exists():
-        parser = StandoffXMLParser()
+        parser = StandoffXMLParser(
+            dtd_path=dtd_path,
+            validate_dtd=validate_dtd
+        )
         index_parser = IndexParser(standoff_dir)
         
         all_glosses = []
