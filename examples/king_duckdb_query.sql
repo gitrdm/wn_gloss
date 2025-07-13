@@ -12,7 +12,7 @@ SELECT
     '🤴 KING SYNSETS' as section,
     synset_id,
     pos,
-    gloss.original_text as definition
+    gloss.tokens as definition
 FROM read_json_auto('/home/rdmerrio/lgits/wn_gloss/old_gloss/json_file/wordnet.jsonl') w
 WHERE list_contains(list_transform(w.terms, x -> x.term), 'king')
 ORDER BY synset_id
@@ -25,7 +25,7 @@ SELECT
     '👑 RELATED SYNSETS FOR: ' || related_word as section,
     synset_id,
     pos,
-    gloss.original_text as definition
+    gloss.tokens as definition
 FROM (
     -- Define the key words we want to look up
     SELECT unnest(['male', 'sovereign', 'ruler', 'kingdom']) as related_word
