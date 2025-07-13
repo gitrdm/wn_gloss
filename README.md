@@ -318,6 +318,196 @@ wn-gloss search --jsonl ./wordnet_glosses.jsonl \
                 --output-format json
 ```
 
+### Database GUI Exploration
+
+The JSONL files can be explored using database GUI tools like DBeaver, DataGrip, or similar database clients by connecting through DuckDB:
+
+#### **Option 1: DBeaver with DuckDB**
+1. **Install DuckDB CLI** (if not already installed):
+   ```bash
+   # Ubuntu/Debian
+   sudo apt install duckdb
+   
+   # macOS
+   brew install duckdb
+   
+   # Or download from https://duckdb.org/docs/installation/
+   ```
+
+2. **Connect DBeaver to DuckDB**:
+   - Create new connection → DuckDB
+   - Database path: `/path/to/your/database.db` (create new file)
+   - Connect and run queries like:
+   ```sql
+   -- Load JSONL data
+   CREATE TABLE wordnet_data AS 
+   SELECT * FROM read_json_auto('/path/to/wordnet_glosses.jsonl');
+   
+   -- Explore the data
+   SELECT pos, COUNT(*) as count 
+   FROM wordnet_data 
+   GROUP BY pos 
+   ORDER BY count DESC;
+   ```
+
+#### **Option 2: DuckDB Web Interface**
+Start a local DuckDB server for web-based exploration:
+```bash
+# Create a simple DuckDB server script
+cat > duckdb_server.py << 'EOF'
+import duckdb
+import json
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import urllib.parse
+
+class DuckDBHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            html = '''
+            <!DOCTYPE html>
+            <html>
+            <head><title>WordNet JSONL Explorer</title></head>
+            <body>
+                <h1>WordNet JSONL Explorer</h1>
+                <form action="/query" method="post">
+                    <textarea name="sql" rows="10" cols="80" placeholder="Enter SQL query here...">
+SELECT pos, COUNT(*) as count 
+FROM read_json_auto('wordnet_glosses.jsonl') 
+GROUP BY pos 
+ORDER BY count DESC;
+                    </textarea><br>
+                    <input type="submit" value="Execute Query">
+                </form>
+            </body>
+            </html>
+            '''
+            self.wfile.write(html.encode())
+    
+    def do_POST(self):
+        if self.path == '/query':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            form_data = urllib.parse.parse_qs(post_data.decode())
+            sql = form_data.get('sql', [''])[0]
+            
+            try:
+                conn = duckdb.connect(':memory:')
+                results = conn.execute(sql).fetchall()
+                columns = [desc[0] for desc in conn.description]
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                
+                response = {
+                    'columns': columns,
+                    'data': results
+                }
+                self.wfile.write(json.dumps(response, indent=2).encode())
+                
+            except Exception as e:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+
+if __name__ == '__main__':
+    server = HTTPServer(('localhost', 8000), DuckDBHandler)
+    print("Server running at http://localhost:8000")
+    server.serve_forever()
+EOF
+
+# Run the server
+python duckdb_server.py
+```
+
+#### **Option 3: Jupyter Notebook Exploration**
+For interactive exploration with visualizations:
+```python
+import duckdb
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Connect to DuckDB
+conn = duckdb.connect(':memory:')
+
+# Load JSONL data
+df = conn.execute("""
+    SELECT * FROM read_json_auto('wordnet_glosses.jsonl')
+""").fetchdf()
+
+# Basic exploration
+print("Dataset shape:", df.shape)
+print("\nPart of speech distribution:")
+print(df['pos'].value_counts())
+
+# Visualizations
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='pos')
+plt.title('Distribution of Parts of Speech')
+plt.show()
+
+# Analyze gloss lengths
+df['gloss_length'] = df['gloss'].apply(lambda x: len(x.get('original_text', '')))
+plt.figure(figsize=(10, 6))
+sns.boxplot(data=df, x='pos', y='gloss_length')
+plt.title('Gloss Length Distribution by Part of Speech')
+plt.show()
+```
+
+#### **Option 4: Command Line Exploration**
+Quick exploration using the built-in CLI:
+```bash
+# Interactive queries
+wn-gloss query --jsonl wordnet_glosses.jsonl \
+               --sql "SELECT pos, COUNT(*) FROM read_json_auto('wordnet_glosses.jsonl') GROUP BY pos"
+
+# Export for external tools
+wn-gloss export --jsonl wordnet_glosses.jsonl \
+                --sql "SELECT synset_id, pos, gloss.original_text FROM read_json_auto('wordnet_glosses.jsonl') LIMIT 1000" \
+                --output sample_data.csv
+
+# Then import sample_data.csv into Excel, Tableau, etc.
+```
+
+#### **Common Exploration Queries**
+```sql
+-- Basic statistics
+SELECT 
+    COUNT(*) as total_synsets,
+    COUNT(DISTINCT pos) as unique_pos,
+    AVG(LENGTH(gloss.original_text)) as avg_gloss_length
+FROM read_json_auto('wordnet_glosses.jsonl');
+
+-- Find synsets with the most terms
+SELECT 
+    synset_id, 
+    pos, 
+    ARRAY_LENGTH(terms) as term_count,
+    list_transform(terms, x -> x.term) as all_terms
+FROM read_json_auto('wordnet_glosses.jsonl')
+ORDER BY term_count DESC
+LIMIT 10;
+
+-- Search for specific concepts
+SELECT synset_id, pos, gloss.original_text
+FROM read_json_auto('wordnet_glosses.jsonl')
+WHERE gloss.original_text ILIKE '%computer%'
+LIMIT 10;
+
+-- Analyze annotation patterns
+SELECT 
+    pos,
+    AVG(ARRAY_LENGTH(gloss.annotations)) as avg_annotations,
+    AVG(ARRAY_LENGTH(gloss.tokens)) as avg_tokens
+FROM read_json_auto('wordnet_glosses.jsonl')
+GROUP BY pos;
+```
+
 ### Python API
 
 ```python
@@ -633,3 +823,193 @@ Based on: Princeton University WordNet Gloss Disambiguation Project (2008)
 ## Support
 
 For issues, feature requests, or questions, please open an issue on the project repository.
+
+### Database GUI Exploration
+
+The JSONL files can be explored using database GUI tools like DBeaver, DataGrip, or similar database clients by connecting through DuckDB:
+
+#### **Option 1: DBeaver with DuckDB**
+1. **Install DuckDB CLI** (if not already installed):
+   ```bash
+   # Ubuntu/Debian
+   sudo apt install duckdb
+   
+   # macOS
+   brew install duckdb
+   
+   # Or download from https://duckdb.org/docs/installation/
+   ```
+
+2. **Connect DBeaver to DuckDB**:
+   - Create new connection → DuckDB
+   - Database path: `/path/to/your/database.db` (create new file)
+   - Connect and run queries like:
+   ```sql
+   -- Load JSONL data
+   CREATE TABLE wordnet_data AS 
+   SELECT * FROM read_json_auto('/path/to/wordnet_glosses.jsonl');
+   
+   -- Explore the data
+   SELECT pos, COUNT(*) as count 
+   FROM wordnet_data 
+   GROUP BY pos 
+   ORDER BY count DESC;
+   ```
+
+#### **Option 2: DuckDB Web Interface**
+Start a local DuckDB server for web-based exploration:
+```bash
+# Create a simple DuckDB server script
+cat > duckdb_server.py << 'EOF'
+import duckdb
+import json
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import urllib.parse
+
+class DuckDBHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            html = '''
+            <!DOCTYPE html>
+            <html>
+            <head><title>WordNet JSONL Explorer</title></head>
+            <body>
+                <h1>WordNet JSONL Explorer</h1>
+                <form action="/query" method="post">
+                    <textarea name="sql" rows="10" cols="80" placeholder="Enter SQL query here...">
+SELECT pos, COUNT(*) as count 
+FROM read_json_auto('wordnet_glosses.jsonl') 
+GROUP BY pos 
+ORDER BY count DESC;
+                    </textarea><br>
+                    <input type="submit" value="Execute Query">
+                </form>
+            </body>
+            </html>
+            '''
+            self.wfile.write(html.encode())
+    
+    def do_POST(self):
+        if self.path == '/query':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            form_data = urllib.parse.parse_qs(post_data.decode())
+            sql = form_data.get('sql', [''])[0]
+            
+            try:
+                conn = duckdb.connect(':memory:')
+                results = conn.execute(sql).fetchall()
+                columns = [desc[0] for desc in conn.description]
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                
+                response = {
+                    'columns': columns,
+                    'data': results
+                }
+                self.wfile.write(json.dumps(response, indent=2).encode())
+                
+            except Exception as e:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+
+if __name__ == '__main__':
+    server = HTTPServer(('localhost', 8000), DuckDBHandler)
+    print("Server running at http://localhost:8000")
+    server.serve_forever()
+EOF
+
+# Run the server
+python duckdb_server.py
+```
+
+#### **Option 3: Jupyter Notebook Exploration**
+For interactive exploration with visualizations:
+```python
+import duckdb
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Connect to DuckDB
+conn = duckdb.connect(':memory:')
+
+# Load JSONL data
+df = conn.execute("""
+    SELECT * FROM read_json_auto('wordnet_glosses.jsonl')
+""").fetchdf()
+
+# Basic exploration
+print("Dataset shape:", df.shape)
+print("\nPart of speech distribution:")
+print(df['pos'].value_counts())
+
+# Visualizations
+plt.figure(figsize=(10, 6))
+sns.countplot(data=df, x='pos')
+plt.title('Distribution of Parts of Speech')
+plt.show()
+
+# Analyze gloss lengths
+df['gloss_length'] = df['gloss'].apply(lambda x: len(x.get('original_text', '')))
+plt.figure(figsize=(10, 6))
+sns.boxplot(data=df, x='pos', y='gloss_length')
+plt.title('Gloss Length Distribution by Part of Speech')
+plt.show()
+```
+
+#### **Option 4: Command Line Exploration**
+Quick exploration using the built-in CLI:
+```bash
+# Interactive queries
+wn-gloss query --jsonl wordnet_glosses.jsonl \
+               --sql "SELECT pos, COUNT(*) FROM read_json_auto('wordnet_glosses.jsonl') GROUP BY pos"
+
+# Export for external tools
+wn-gloss export --jsonl wordnet_glosses.jsonl \
+                --sql "SELECT synset_id, pos, gloss.original_text FROM read_json_auto('wordnet_glosses.jsonl') LIMIT 1000" \
+                --output sample_data.csv
+
+# Then import sample_data.csv into Excel, Tableau, etc.
+```
+
+#### **Common Exploration Queries**
+```sql
+-- Basic statistics
+SELECT 
+    COUNT(*) as total_synsets,
+    COUNT(DISTINCT pos) as unique_pos,
+    AVG(LENGTH(gloss.original_text)) as avg_gloss_length
+FROM read_json_auto('wordnet_glosses.jsonl');
+
+-- Find synsets with the most terms
+SELECT 
+    synset_id, 
+    pos, 
+    ARRAY_LENGTH(terms) as term_count,
+    list_transform(terms, x -> x.term) as all_terms
+FROM read_json_auto('wordnet_glosses.jsonl')
+ORDER BY term_count DESC
+LIMIT 10;
+
+-- Search for specific concepts
+SELECT synset_id, pos, gloss.original_text
+FROM read_json_auto('wordnet_glosses.jsonl')
+WHERE gloss.original_text ILIKE '%computer%'
+LIMIT 10;
+
+-- Analyze annotation patterns
+SELECT 
+    pos,
+    AVG(ARRAY_LENGTH(gloss.annotations)) as avg_annotations,
+    AVG(ARRAY_LENGTH(gloss.tokens)) as avg_tokens
+FROM read_json_auto('wordnet_glosses.jsonl')
+GROUP BY pos;
+```

@@ -9,7 +9,7 @@ import duckdb
 def main():
     # Connect to DuckDB
     conn = duckdb.connect(':memory:')
-    jsonl_path = '/home/rdmerrio/lgits/wn_gloss/old_gloss/json_file/wordnet.jsonl'
+    jsonl_path = './json_file/wordnet.jsonl'
     
     print("🔍 QUERY EXAMPLE: King Definitions with Related Synsets")
     print("=" * 70)
@@ -56,7 +56,7 @@ def main():
     
     combined_result = conn.execute('''
         WITH king_main AS (
-            SELECT synset_id, gloss.original_text as definition
+            SELECT synset_id, gloss.tokens as definition
             FROM read_json_auto(?) w
             WHERE list_contains(list_transform(w.terms, x -> x.term), 'king')
               AND synset_id = 'n10231515'  -- male sovereign sense
@@ -66,7 +66,7 @@ def main():
             k.definition as king_definition,
             w.synset_id as related_synset,
             list_transform(w.terms, x -> x.term)[1] as related_term,
-            w.gloss.original_text as related_definition
+            w.gloss.tokens as related_definition
         FROM king_main k
         CROSS JOIN read_json_auto(?) w
         WHERE list_contains(list_transform(w.terms, x -> x.term), 'male')
